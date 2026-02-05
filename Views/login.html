@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Status Panel</title>
+  <meta name="theme-color" content="#fbcfe8" />
+  <style>
+    :root{
+      --bg1:#fdf2f8;
+      --bg2:#e0f2fe;
+      --card:#ffffffcc;
+      --muted:#6b7280;
+      --text:#3f3f46;
+      --accent:#a5b4fc;
+      --accent2:#f9a8d4;
+      --shadow: 0 10px 30px rgba(0,0,0,.08);
+      --radius:18px;
+      --soft:#fce7f3;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Segoe UI Emoji";
+      background: linear-gradient(135deg,var(--bg1),var(--bg2));
+      color:var(--text);
+      padding:16px;
+      min-height:100vh;
+    }
+    .wrap{max-width:560px;margin:0 auto;padding-bottom:28px;}
+    header{display:flex;justify-content:space-between;align-items:flex-start;margin:6px 0 14px;}
+    h1{margin:0;font-size:22px}
+    .subhead{font-size:13px;color:var(--muted);margin-top:4px}
+    .card{
+      background:var(--card);
+      backdrop-filter: blur(6px);
+      border-radius:var(--radius);
+      padding:14px;
+      margin:12px 0;
+      box-shadow:var(--shadow);
+    }
+    .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+    .label{font-weight:700;font-size:14px}
+    .sub{font-size:12px;color:var(--muted);margin-top:2px}
+    .btn{
+      width:100%;
+      padding:14px;
+      border:0;
+      border-radius:14px;
+      font-weight:800;
+      font-size:15px;
+      background:linear-gradient(135deg,var(--accent2),var(--accent));
+      color:white;
+      box-shadow:0 8px 20px rgba(0,0,0,.12);
+      cursor:pointer;
+    }
+    .btn:disabled{opacity:.55;cursor:not-allowed}
+    .btn-ghost{
+      width:100%;
+      padding:12px 14px;
+      border-radius:14px;
+      background:#fff;
+      border:1px solid rgba(0,0,0,.08);
+      font-weight:700;
+      cursor:pointer;
+    }
+    .tiny{
+      font-size:12px;color:var(--muted)
+    }
+    .input{
+      width:100%;
+      padding:13px 14px;
+      border-radius:14px;
+      border:1px solid rgba(0,0,0,.10);
+      outline:none;
+      font-size:14px;
+      background:#fff;
+    }
+    .hintBox{
+      background:#fff;
+      border:1px dashed rgba(0,0,0,.15);
+      border-radius:14px;
+      padding:10px 12px;
+      font-size:13px;
+      color:var(--muted);
+    }
+
+    /* screens */
+    .screen{display:none}
+    .screen.active{display:block}
+
+    /* Emoji code input */
+    .codeRow{
+      display:flex;
+      gap:10px;
+      margin-top:12px;
+      justify-content:space-between;
+    }
+    .slot{
+      flex:1;
+      aspect-ratio: 1/1;
+      border-radius:16px;
+      background:#fff;
+      border:2px solid rgba(0,0,0,.08);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:34px;
+      box-shadow: 0 6px 14px rgba(0,0,0,.06);
+      user-select:none;
+    }
+    .slot.filled{
+      border-color: rgba(249,168,212,.75);
+      background: #fff7fb;
+    }
+    .slot.active{
+      outline: 3px solid rgba(165,180,252,.55);
+      outline-offset: 2px;
+    }
+    .codeActions{
+      display:flex;
+      gap:10px;
+      margin-top:12px;
+    }
+
+    /* Emoji picker (scrollable) */
+    .pickerWrap{
+      margin-top:14px;
+    }
+    .pickerHead{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      margin-bottom:8px;
+    }
+    .picker{
+      display:grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap:8px;
+      max-height: 220px;
+      overflow:auto;
+      padding-right:4px;
+    }
+    .eBtn{
+      border:0;
+      background:#fff;
+      border-radius:14px;
+      aspect-ratio: 1/1;
+      font-size:22px;
+      cursor:pointer;
+      box-shadow: 0 6px 14px rgba(0,0,0,.06);
+      border:1px solid rgba(0,0,0,.06);
+      transition: transform .12s ease;
+    }
+    .eBtn:active{transform: scale(.95)}
+    .picker::-webkit-scrollbar{width:10px}
+    .picker::-webkit-scrollbar-thumb{background: rgba(0,0,0,.12);border-radius:999px}
+
+    /* Result code */
+    .codeBig{
+      display:flex;
+      gap:10px;
+      justify-content:center;
+      margin-top:12px;
+    }
+    .bigChip{
+      width:66px;
+      aspect-ratio:1/1;
+      border-radius:18px;
+      background: var(--soft);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:36px;
+      border:1px solid rgba(0,0,0,.06);
+      box-shadow: 0 6px 14px rgba(0,0,0,.06);
+    }
+
+    .toast{
+      position:fixed;
+      left:50%;
+      bottom:18px;
+      transform: translateX(-50%);
+      background:#111827;
+      color:#fff;
+      font-size:13px;
+      padding:10px 12px;
+      border-radius:999px;
+      opacity:0;
+      pointer-events:none;
+      transition: opacity .25s ease;
+    }
+    .toast.show{opacity:1}
+
+    @media (max-width:420px){
+      .picker{grid-template-columns: repeat(6, 1fr);}
+    }
+	.keypad{
+	  display:grid;
+	  grid-template-columns: repeat(3, 1fr);
+	  gap:10px;
+	  margin-top:14px;
+	  max-width:260px;       /* keeps the pad compact */
+	  margin-left:auto;
+	  margin-right:auto;
+	}
+
+	.keypad button{
+	  border:0;
+	  background:#fff;
+	  border-radius:16px;
+	  aspect-ratio: 1 / 1;
+	  font-size:28px;        /* smaller emoji */
+	  cursor:pointer;
+	  box-shadow: 0 6px 14px rgba(0,0,0,.08);
+	  border:1px solid rgba(0,0,0,.06);
+	  transition: transform .12s ease;
+	}
+
+	.keypad button:active{
+	  transform: scale(.92);
+	}
+
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Status Panel</h1>
+        <div class="subhead">Login mit 4 Emojis. Danach Status senden 💌</div>
+      </div>
+    </header>
+
+    <!-- SCREEN: LOGIN -->
+    <div class="screen active" id="screenLogin">
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="label">Login</div>
+            <div class="sub">Gib deinen Pair Code ein (4 Emojis)</div>
+          </div>
+        </div>
+
+        <div class="codeRow" id="codeRow">
+          <div class="slot active" data-i="0" id="slot0">⬜</div>
+          <div class="slot" data-i="1" id="slot1">⬜</div>
+          <div class="slot" data-i="2" id="slot2">⬜</div>
+          <div class="slot" data-i="3" id="slot3">⬜</div>
+        </div>
+
+        <div class="codeActions">
+          <button class="btn-ghost" type="button" id="backspaceBtn">⌫ Löschen</button>
+          <button class="btn-ghost" type="button" id="clearBtn">Alles löschen</button>
+        </div>
+
+        <div class="pickerWrap">
+          <div class="pickerHead">
+            <div class="label" style="font-size:13px;">Emoji Auswahl</div>
+            <div class="tiny">Tippe 4 Emojis</div>
+          </div>
+          <div class="keypad" id="emojiKeypad"></div>
+        </div>
+
+        <div style="margin-top:14px;">
+          <button class="btn" type="button" id="loginBtn" disabled>Einloggen</button>
+          <div class="tiny" style="margin-top:8px;" id="loginHint">
+            Tipp: Du kannst den Code auch als Screenshot speichern.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="label">Noch kein Pair?</div>
+            <div class="sub">Erstelle einen neuen Pair Code und trage die E-Mail deines BF ein.</div>
+          </div>
+        </div>
+        <button class="btn-ghost" type="button" id="goCreateBtn" style="margin-top:10px;">Neues Pair erstellen</button>
+      </div>
+    </div>
+
+    <!-- SCREEN: CREATE -->
+    <div class="screen" id="screenCreate">
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="label">Neues Pair erstellen</div>
+            <div class="sub">Dein BF bekommt Status Updates per E-Mail.</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <div class="tiny" style="margin-bottom:6px;">E-Mail vom BF</div>
+          <input class="input" id="bfEmail" type="email" placeholder="z.B. max@example.com" autocomplete="email" />
+        </div>
+
+        <div style="margin-top:12px;">
+          <button class="btn" type="button" id="createBtn">Pair erstellen (Demo)</button>
+          <div class="tiny" style="margin-top:8px;">
+            Später ersetzt du "Demo" durch Azure API Call.
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="resultCard" style="display:none;">
+        <div class="row">
+          <div>
+            <div class="label">Dein Pair Code</div>
+            <div class="sub">Bitte merken oder Screenshot machen.</div>
+          </div>
+        </div>
+
+        <div class="codeBig" id="createdCodeBig"></div>
+
+        <div class="hintBox" style="margin-top:12px;" id="createdCodeText"></div>
+
+        <div class="codeActions" style="margin-top:12px;">
+          <button class="btn-ghost" type="button" id="copyCodeBtn">📋 Kopieren</button>
+          <button class="btn-ghost" type="button" id="useForLoginBtn">✅ Zum Login übernehmen</button>
+        </div>
+      </div>
+
+      <button class="btn-ghost" type="button" id="backToLoginBtn">← Zurück zum Login</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Kopiert ✅</div>
+
+  <script>
+    // ---- Emoji pool (curated "cute" set) ----
+    <!-- const EMOJIS = [ -->
+      <!-- "🐻","🐼","🐰","🐶","🐱","🐹","🦊","🐸", -->
+      <!-- "🐥","🦄","🐙","🐳","🐝","🦋","🐞","🦕", -->
+      <!-- "🍓","🍒","🍑","🍉","🍇","🍪","🍰","🧁", -->
+      <!-- "🍩","🍦","🍫","🍿","🍜","🍔","🍟","🍕", -->
+      <!-- "🌸","🌼","🌷","🌻","🍀","🌈","⭐","✨", -->
+      <!-- "🌙","☁️","🔥","💫","🎀","🧸","🫶","💖", -->
+      <!-- "💗","💞","💘","💕","💋","😈","😇","🥹", -->
+      <!-- "🪄","🎧","📸","🎮","🧋","🫧","🕯️","🪻" -->
+    <!-- ]; -->
+	const EMOJIS = [
+	  "🐻", // bear
+	  "🐰", // bunny
+	  "🐱", // cat
+	  "🐶", // dog
+	  "🦄", // unicorn
+	  "🌸", // flower
+	  "🌙", // moon
+	  "⭐", // star
+	  "🍓"  // strawberry
+	];
+
+    // ---- UI helpers ----
+    const el = (id) => document.getElementById(id);
+    const show = (id) => {
+      document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+      el(id).classList.add("active");
+    };
+    const toast = (msg) => {
+      const t = el("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 1200);
+    };
+
+    // ---- Login code input (4 slots) ----
+    let code = ["", "", "", ""];
+    let activeIndex = 0;
+
+    function renderSlots(){
+      for(let i=0;i<4;i++){
+        const slot = el("slot"+i);
+        slot.textContent = code[i] ? code[i] : "⬜";
+        slot.classList.toggle("filled", !!code[i]);
+        slot.classList.toggle("active", i === activeIndex);
+      }
+      el("loginBtn").disabled = code.some(x => !x);
+    }
+
+    function pushEmoji(e){
+      if(activeIndex > 3) return;
+      code[activeIndex] = e;
+      activeIndex = Math.min(activeIndex + 1, 3);
+      // move to next empty slot if any
+      for(let i=0;i<4;i++){
+        if(!code[i]){ activeIndex = i; break; }
+      }
+      renderSlots();
+    }
+
+    function backspace(){
+      // if current slot filled, clear it. else go back to previous filled.
+      if(code[activeIndex]){
+        code[activeIndex] = "";
+      } else {
+        for(let i=activeIndex-1;i>=0;i--){
+          if(code[i]){
+            code[i] = "";
+            activeIndex = i;
+            break;
+          }
+        }
+      }
+      renderSlots();
+    }
+
+    function clearAll(){
+      code = ["","","",""];
+      activeIndex = 0;
+      renderSlots();
+    }
+
+    // Click slot to set active index
+    document.querySelectorAll(".slot").forEach(s => {
+      s.addEventListener("click", () => {
+        activeIndex = Number(s.dataset.i);
+        renderSlots();
+      });
+    });
+
+    el("backspaceBtn").addEventListener("click", backspace);
+    el("clearBtn").addEventListener("click", clearAll);
+
+    // Build emoji picker
+	const keypad = el("emojiKeypad");
+
+	EMOJIS.forEach(e => {
+	  const b = document.createElement("button");
+	  b.type = "button";
+	  b.textContent = e;
+	  b.addEventListener("click", () => pushEmoji(e));
+	  keypad.appendChild(b);
+	});
+
+
+    // Demo login: later replace with /api/pair/login
+    el("loginBtn").addEventListener("click", async () => {
+      const pairCode = code.join("");
+      // In demo: accept any full code and "store session"
+      localStorage.setItem("pairCode", pairCode);
+      toast("Login (Demo) ✅");
+
+      // next step would be: window.location = "panel.html" or show panel screen
+      // For now:
+      alert("Login OK (Demo). Nächster Schritt: Main Panel screen einbauen.");
+    });
+
+    // ---- Create pair (Demo) ----
+    function randomPairCode(){
+      const used = new Set();
+      const out = [];
+      while(out.length < 4){
+        const e = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+        // allow duplicates? usually no, nicer without duplicates
+        if(used.has(e)) continue;
+        used.add(e);
+        out.push(e);
+      }
+      return out.join("");
+    }
+
+    function renderCreatedCode(codeStr){
+      el("createdCodeBig").innerHTML = "";
+      for(const ch of [...codeStr]){
+        const chip = document.createElement("div");
+        chip.className = "bigChip";
+        chip.textContent = ch;
+        el("createdCodeBig").appendChild(chip);
+      }
+      el("createdCodeText").textContent = "Dein Pair Code ist: " + codeStr;
+    }
+
+    el("createBtn").addEventListener("click", async () => {
+      const email = el("bfEmail").value.trim();
+      if(!email || !email.includes("@")){
+        toast("Bitte gültige E-Mail");
+        return;
+      }
+
+      // DEMO: generate locally
+      const created = randomPairCode();
+
+      // Later replace with:
+      // const res = await fetch("/api/pair/create", {method:"POST", headers:{...}, body: JSON.stringify({ bfEmail: email })});
+      // const data = await res.json(); created = data.pairCode;
+
+      localStorage.setItem("lastCreatedPairCode", created);
+      localStorage.setItem("bfEmail", email);
+
+      renderCreatedCode(created);
+      el("resultCard").style.display = "block";
+      toast("Pair erstellt ✅");
+    });
+
+    el("copyCodeBtn").addEventListener("click", async () => {
+      const created = localStorage.getItem("lastCreatedPairCode") || "";
+      if(!created){ toast("Kein Code"); return; }
+      try{
+        await navigator.clipboard.writeText(created);
+        toast("Kopiert ✅");
+      }catch{
+        toast("Kopieren nicht möglich");
+      }
+    });
+
+    el("useForLoginBtn").addEventListener("click", () => {
+      const created = localStorage.getItem("lastCreatedPairCode") || "";
+      if(!created){ toast("Kein Code"); return; }
+      code = [...created].slice(0,4);
+      activeIndex = 0;
+      renderSlots();
+      show("screenLogin");
+      toast("Übernommen ✅");
+    });
+
+    // Navigation
+    el("goCreateBtn").addEventListener("click", () => show("screenCreate"));
+    el("backToLoginBtn").addEventListener("click", () => show("screenLogin"));
+
+    // Init
+    renderSlots();
+  </script>
+</body>
+</html>
