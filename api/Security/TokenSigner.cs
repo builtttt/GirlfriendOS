@@ -32,7 +32,10 @@ public static class TokenSigner
             if (!ConstantTimeEquals(sigB64, expectedSig)) return default;
 
             var json = Encoding.UTF8.GetString(Base64UrlDecode(payloadB64));
-            return JsonSerializer.Deserialize<T>(json);
+            return JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
         }
         catch
         {

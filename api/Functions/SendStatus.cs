@@ -38,7 +38,7 @@ public sealed class SendStatus
             return req.CreateResponse(HttpStatusCode.Unauthorized);
 
         var session = TokenSigner.VerifyToken<SessionPayload>(bearer, sessionSecret);
-        if (session is null || DateTimeOffset.UtcNow.ToUnixTimeSeconds() > session.exp)
+        if (session is null || DateTimeOffset.UtcNow.ToUnixTimeSeconds() > session.Exp)
             return req.CreateResponse(HttpStatusCode.Unauthorized);
 
         // Read JSON
@@ -97,7 +97,7 @@ public sealed class SendStatus
             using var conn = PairRepo.Open(connStr);
             await conn.OpenAsync();
 
-            var pair = await PairRepo.GetById(conn, session.pairId);
+            var pair = await PairRepo.GetById(conn, session.PairId);
             if (pair is null)
                 return req.CreateResponse(HttpStatusCode.Unauthorized);
 
@@ -235,7 +235,7 @@ public sealed class SendStatus
         return "Bereitschaft halten";
     }
     
-    private sealed record SessionPayload(Guid pairId, long exp, string nonce);
+    private sealed record SessionPayload(Guid PairId, long Exp, string Nonce);
 
     private static bool TryGetBearer(HttpRequestData req, out string token)
     {

@@ -68,10 +68,10 @@ public sealed class LoginFinish
                 return req.CreateResponse(HttpStatusCode.Unauthorized);
         }
 
-        // issue session token bound to PairId (expires in 12h)
+        // issue session token bound to PairId (expires in 24h)
         var sessionPayload = new SessionPayload(
             PairId: payload.PairId,
-            Exp: DateTimeOffset.UtcNow.AddHours(12).ToUnixTimeSeconds(),
+            Exp: DateTimeOffset.UtcNow.AddHours(24).ToUnixTimeSeconds(),
             Nonce: Guid.NewGuid().ToString("N")
         );
 
