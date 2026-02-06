@@ -667,7 +667,6 @@
     render();
 	const sendBtn = document.getElementById("sendBtn");
 	const sendStatusEl = document.getElementById("sendStatus");
-	const lastSentEl = document.getElementById("lastSent");
 
 	async function sendStatus(){
 	  sendBtn.disabled = true;
@@ -702,8 +701,6 @@
 		  throw new Error(`HTTP ${res.status} ${t}`.trim());
 		}
 
-		const now = new Date();
-		lastSentEl.textContent = "Zuletzt gesendet: " + now.toLocaleString();
 		sendStatusEl.textContent = "Gesendet ✅";
 		setTimeout(() => sendStatusEl.textContent = "Bereit", 1500);
 	  }catch(err){
