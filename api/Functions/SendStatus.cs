@@ -34,8 +34,9 @@ public sealed class SendStatus
             return err;
         }
 
-        if (!TryGetBearer(req, out var bearer))
+        if (!TryGetSession(req, out var bearer))
             return req.CreateResponse(HttpStatusCode.Unauthorized);
+
 
         var session = TokenSigner.VerifyToken<SessionPayload>(bearer, sessionSecret);
         if (session is null || DateTimeOffset.UtcNow.ToUnixTimeSeconds() > session.Exp)
@@ -237,14 +238,30 @@ public sealed class SendStatus
     
     private sealed record SessionPayload(Guid PairId, long Exp, string Nonce);
 
-    private static bool TryGetBearer(HttpRequestData req, out string token)
+    private static bool TryGetSession(HttpRequestData req, out string token)
     {
         token = "";
-        if (!req.Headers.TryGetValues("Authorization", out var values)) return false;
-        var h = values.FirstOrDefault() ?? "";
-        if (!h.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) return false;
-        token = h["Bearer ".Length..].Trim();
-        return token.Length > 20;
+
+        // Preferred: custom header (works reliably behind SWA)
+        if (req.Headers.TryGetValues("X-GF-Session", out var v1))
+        {
+            token = (v1.FirstOrDefault() ?? "").Trim();
+            return token.Length > 20;
+        }
+
+        // Fallback: Authorization Bearer (keep for local/dev)
+        if (req.Headers.TryGetValues("Authorization", out var values))
+        {
+            var h = values.FirstOrDefault() ?? "";
+            if (h.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                token = h["Bearer ".Length..].Trim();
+                return token.Length > 20;
+            }
+        }
+
+        return false;
     }
+
 }
 

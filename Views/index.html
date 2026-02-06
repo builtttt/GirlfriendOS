@@ -687,12 +687,13 @@
 		  method: "POST",
 		  headers: { 
 			"Content-Type": "application/json",
-			"Authorization": "Bearer " + token
+			"X-GF-Session": token
 		  },
 		  body: JSON.stringify(payload)
 		});
 		
 		if(res.status === 401){
+			alert("Session abgelaufen 🥲 Bitte neu einloggen.");
 			logout();
 			return;
 		}
