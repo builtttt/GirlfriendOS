@@ -82,7 +82,7 @@ public sealed class Register
         await res.WriteAsJsonAsync(new RegisterResponse
         {
             PairId = id,
-            EmojiIds = new byte[] { e0, e1, e2, e3 }
+            EmojiIds = new[] { (int)e0, (int)e1, (int)e2, (int)e3 }
         });
         return res;
     }

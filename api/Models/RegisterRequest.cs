@@ -15,5 +15,5 @@ public sealed class RegisterRequest
 public sealed class RegisterResponse
 {
     public required Guid PairId { get; init;}
-    public required byte[] EmojiIds { get; init; } // length 4
+    public required int[] EmojiIds { get; init; } // length 4
 }
