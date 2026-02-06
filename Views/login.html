@@ -293,13 +293,18 @@
           </div>
         </div>
 
-        <div style="margin-top:12px;">
-          <div class="tiny" style="margin-bottom:6px;">E-Mail vom BF</div>
-          <input class="input" id="bfEmail" type="email" placeholder="z.B. max@example.com" autocomplete="email" />
-        </div>
+		<div style="margin-top:12px;">
+		  <div class="tiny" style="margin-bottom:6px;">Dein Name</div>
+		  <input class="input" id="gfName" type="text" placeholder="z.B. Lisa" autocomplete="name" />
+		</div>
+
+		<div style="margin-top:12px;">
+		  <div class="tiny" style="margin-bottom:6px;">E-Mail vom BF</div>
+		  <input class="input" id="bfEmail" type="email" placeholder="z.B. max@example.com" autocomplete="email" />
+		</div>
 
         <div style="margin-top:12px;">
-          <button class="btn" type="button" id="createBtn">Pair erstellen (Demo)</button>
+			<button class="btn" type="button" id="createBtn">Pair erstellen</button>
           <div class="tiny" style="margin-top:8px;">
             Später ersetzt du "Demo" durch Azure API Call.
           </div>
@@ -375,8 +380,6 @@
 		  slot.classList.toggle("filled", !!code[i]);
 		  slot.classList.toggle("active", i === activeIndex);
 		}
-		// loginBtn is now "Start / Continue" only; we enable when we have a board.
-		el("loginBtn").disabled = !boards;
 	  }
 
 	  function clearAll(){
@@ -483,11 +486,19 @@
 		clearAll();
 
 		try{
-		  const res = await fetch("/api/login/start", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({}) // empty
-		  });
+		  const pairId = localStorage.getItem("pairId");
+			if(!pairId){
+			  toast("Kein PairId. Bitte zuerst Pair erstellen.");
+			  el("loginBtn").disabled = false;
+			  return;
+			}
+
+			const res = await fetch(`/api/login/start?pairId=${encodeURIComponent(pairId)}`, {
+			  method: "POST",
+			  headers: { "Content-Type": "application/json" },
+			  body: "{}"
+			});
+
 
 		  if(!res.ok){
 			const t = await res.text().catch(() => "");
@@ -569,69 +580,111 @@
 	  el("loginBtn").addEventListener("click", async () => {
 		await startLogin();
 	  });
-
-	  // ---- Create pair (Demo) ----
-	  function randomPairCode(){
-		const used = new Set();
-		const out = [];
-		while(out.length < 4){
-		  const e = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
-		  if(used.has(e)) continue;
-		  used.add(e);
-		  out.push(e);
-		}
-		return out.join("");
-	  }
-
-	  function renderCreatedCode(codeStr){
-		el("createdCodeBig").innerHTML = "";
-		for(const ch of [...codeStr]){
-		  const chip = document.createElement("div");
-		  chip.className = "bigChip";
-		  chip.textContent = ch;
-		  el("createdCodeBig").appendChild(chip);
-		}
-		el("createdCodeText").textContent = "Dein Pair Code ist: " + codeStr;
-	  }
-
-	  el("createBtn").addEventListener("click", async () => {
-		const email = el("bfEmail").value.trim();
-		if(!email || !email.includes("@")){
-		  toast("Bitte gültige E-Mail");
-		  return;
+		function emojiStrFromIds(ids){
+		  return ids.map(id => emojiFromId(id)).join("");
 		}
 
-		const created = randomPairCode();
-		localStorage.setItem("lastCreatedPairCode", created);
-		localStorage.setItem("bfEmail", email);
+		function renderCreatedFromIds(ids){
+		  const codeStr = emojiStrFromIds(ids);
 
-		renderCreatedCode(created);
-		el("resultCard").style.display = "block";
-		toast("Pair erstellt ✅");
-	  });
-
-	  el("copyCodeBtn").addEventListener("click", async () => {
-		const created = localStorage.getItem("lastCreatedPairCode") || "";
-		if(!created){ toast("Kein Code"); return; }
-		try{
-		  await navigator.clipboard.writeText(created);
-		  toast("Kopiert ✅");
-		}catch{
-		  toast("Kopieren nicht möglich");
+		  el("createdCodeBig").innerHTML = "";
+		  for(const ch of [...codeStr]){
+			const chip = document.createElement("div");
+			chip.className = "bigChip";
+			chip.textContent = ch;
+			el("createdCodeBig").appendChild(chip);
+		  }
+		  el("createdCodeText").textContent = "Dein Pair Code ist: " + codeStr;
 		}
-	  });
+		el("createBtn").addEventListener("click", async () => {
+		  const gfName = (el("gfName")?.value || "").trim();
+		  const bfEmail = (el("bfEmail")?.value || "").trim();
 
-	  // Keep this button, but now it just shows the old code visually (demo)
-	  el("useForLoginBtn").addEventListener("click", () => {
-		const created = localStorage.getItem("lastCreatedPairCode") || "";
-		if(!created){ toast("Kein Code"); return; }
-		// just show it in the slots (not used for auth anymore)
-		code = [...created].slice(0,4);
-		activeIndex = 0;
-		renderSlots();
-		show("screenLogin");
-		toast("Code angezeigt ✅");
-	  });
+		  if(!gfName){
+			toast("Bitte deinen Namen eingeben");
+			return;
+		  }
+		  if(!bfEmail || !bfEmail.includes("@")){
+			toast("Bitte gültige E-Mail");
+			return;
+		  }
+
+		  try{
+			const res = await fetch("/api/register", {
+			  method: "POST",
+			  headers: { "Content-Type": "application/json" },
+			  body: JSON.stringify({ gfName, bfEmail })
+			});
+
+			if(!res.ok){
+			  const t = await res.text().catch(() => "");
+			  throw new Error(`HTTP ${res.status} ${t}`.trim());
+			}
+
+			const data = await res.json();
+			const pairId = data?.pairId ?? data?.PairId;
+			const emojiIds = data?.emojiIds ?? data?.EmojiIds;
+
+			if(!pairId || !emojiIds || emojiIds.length !== 4){
+			  throw new Error("Bad register response");
+			}
+
+			// store for later
+			localStorage.setItem("pairId", pairId);
+			localStorage.setItem("lastCreatedEmojiIds", JSON.stringify(emojiIds));
+			localStorage.setItem("lastCreatedPairCode", emojiStrFromIds(emojiIds));
+
+			// show result
+			renderCreatedFromIds(emojiIds);
+
+			el("resultCard").style.display = "block";
+			toast("Pair erstellt ✅");
+
+			// optional: automatically go to login screen now
+			// show("screenLogin");
+		  }catch(err){
+			console.error(err);
+			toast("Register Fehler ❌");
+			alert("Pair erstellen fehlgeschlagen. Check /api/register.");
+		  }
+		});
+
+		el("useForLoginBtn").addEventListener("click", async () => {
+		  show("screenLogin");
+		  toast("Jetzt einloggen ✅");
+		  // start challenge immediately:
+		  await startLogin();
+		});
+		el("copyCodeBtn").addEventListener("click", async () => {
+		  const codeStr = localStorage.getItem("lastCreatedPairCode") || "";
+		  if(!codeStr){
+			toast("Kein Code");
+			return;
+		  }
+
+		  try{
+			await navigator.clipboard.writeText(codeStr);
+			toast("Kopiert ✅");
+		  }catch{
+			// fallback for browsers where clipboard API is blocked
+			const ta = document.createElement("textarea");
+			ta.value = codeStr;
+			ta.style.position = "fixed";
+			ta.style.left = "-9999px";
+			document.body.appendChild(ta);
+			ta.focus();
+			ta.select();
+			try{
+			  document.execCommand("copy");
+			  toast("Kopiert ✅");
+			}catch{
+			  toast("Kopieren nicht möglich");
+			  alert("Copy failed. Code: " + codeStr);
+			}finally{
+			  ta.remove();
+			}
+		  }
+		});
 
 	  // Navigation
 	  el("goCreateBtn").addEventListener("click", () => show("screenCreate"));
@@ -642,6 +695,8 @@
 	  renderSlots();
 	  renderKeypad();
 	  el("loginHint").textContent = "Tippe auf Einloggen. Dann wähle 4 Emojis (4 Steps).";
+	  el("loginBtn").disabled = false;
+
 </script>
 
 </body>

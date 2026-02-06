@@ -1,15 +1,11 @@
-﻿using GirlfriendPanel.api.Models;
+﻿using GirlfriendPanel.api.Data;
+using GirlfriendPanel.api.Models;
 using GirlfriendPanel.api.Security;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace GirlfriendPanel.api.Functions;
 
@@ -23,47 +19,45 @@ public sealed class LoginStart
     {
         _logger = loggerFactory.CreateLogger<LoginStart>();
     }
-
-    private sealed record ChallengePayload(long Exp, int[] CorrectIndices, string Nonce);
+    private sealed record ChallengePayload(Guid PairId, long Exp, int[] CorrectIndices, string Nonce);
 
     [Function("LoginStart")]
     public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "login/start")] HttpRequestData req)
     {
         var hmacSecret = Environment.GetEnvironmentVariable("LOGIN_HMAC_SECRET");
-        var pairSecret = Environment.GetEnvironmentVariable("PAIR_SECRET_EMOJI_IDS"); 
-        // example: "12,5,33,7" (4 ints from 0..63)
+        var connStr = Environment.GetEnvironmentVariable("SqlConnectionString");
 
-        if (string.IsNullOrWhiteSpace(hmacSecret) || string.IsNullOrWhiteSpace(pairSecret))
+        if (string.IsNullOrWhiteSpace(hmacSecret) || string.IsNullOrWhiteSpace(connStr))
         {
             var err = req.CreateResponse(HttpStatusCode.InternalServerError);
-            await err.WriteStringAsync("Server-Konfiguration fehlt (LOGIN_HMAC_SECRET / PAIR_SECRET_EMOJI_IDS).");
+            await err.WriteStringAsync("Server-Konfiguration fehlt (LOGIN_HMAC_SECRET / SqlConnectionString).");
             return err;
         }
 
-        int[] seq;
-        try
-        {
-            seq = pairSecret.Split(',').Select(s => int.Parse(s.Trim())).ToArray();
-            if (seq.Length != 4 || seq.Any(x => x < 0 || x > 63)) throw new Exception();
-        }
-        catch
-        {
-            var err = req.CreateResponse(HttpStatusCode.InternalServerError);
-            await err.WriteStringAsync("PAIR_SECRET_EMOJI_IDS ist ungültig (muss 4 Zahlen 0..63 sein).");
-            return err;
-        }
+        var pairIdStr = System.Web.HttpUtility.ParseQueryString(req.Url.Query).Get("pairId");
+        if (!Guid.TryParse(pairIdStr, out var pairId))
+            return await Bad(req, "pairId fehlt/ungültig.");
+
+        using var conn = PairRepo.Open(connStr);
+        await conn.OpenAsync();
+        var pair = await PairRepo.GetById(conn, pairId);
+        if (pair is null)
+            return req.CreateResponse(HttpStatusCode.NotFound);
+
+        var seq = new[] { (int)pair.Emoji0, (int)pair.Emoji1, (int)pair.Emoji2, (int)pair.Emoji3 };
 
         var boards = new int[4][];
         var correctIdx = new int[4];
 
         for (int step = 0; step < 4; step++)
         {
-            boards[step] = BuildBoard(seq[step]);              // 9 emojiIds
-            correctIdx[step] = Array.IndexOf(boards[step], seq[step]); // 0..8
+            boards[step] = BuildBoard(seq[step]);
+            correctIdx[step] = Array.IndexOf(boards[step], seq[step]);
         }
 
         var payload = new ChallengePayload(
+            PairId: pairId,
             Exp: DateTimeOffset.UtcNow.AddMinutes(3).ToUnixTimeSeconds(),
             CorrectIndices: correctIdx,
             Nonce: Guid.NewGuid().ToString("N")
@@ -100,5 +94,12 @@ public sealed class LoginStart
             (board[i], board[j]) = (board[j], board[i]);
         }
         return board;
+    }
+
+    private static async Task<HttpResponseData> Bad(HttpRequestData req, string msg)
+    {
+        var r = req.CreateResponse(HttpStatusCode.BadRequest);
+        await r.WriteStringAsync(msg);
+        return r;
     }
 }

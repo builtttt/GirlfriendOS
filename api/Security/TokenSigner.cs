@@ -20,18 +20,26 @@ public static class TokenSigner
 
     public static T? VerifyToken<T>(string token, string secret)
     {
-        var parts = token.Split('.');
-        if (parts.Length != 2) return default;
+        try
+        {
+            var parts = token.Split('.');
+            if (parts.Length != 2) return default;
 
-        var payloadB64 = parts[0];
-        var sigB64 = parts[1];
+            var payloadB64 = parts[0];
+            var sigB64 = parts[1];
 
-        var expectedSig = Base64UrlEncode(HmacSha256(payloadB64, secret));
-        if (!ConstantTimeEquals(sigB64, expectedSig)) return default;
+            var expectedSig = Base64UrlEncode(HmacSha256(payloadB64, secret));
+            if (!ConstantTimeEquals(sigB64, expectedSig)) return default;
 
-        var json = Encoding.UTF8.GetString(Base64UrlDecode(payloadB64));
-        return JsonSerializer.Deserialize<T>(json);
+            var json = Encoding.UTF8.GetString(Base64UrlDecode(payloadB64));
+            return JsonSerializer.Deserialize<T>(json);
+        }
+        catch
+        {
+            return default;
+        }
     }
+
 
     private static byte[] HmacSha256(string payloadB64, string secret)
     {

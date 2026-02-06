@@ -8,6 +8,8 @@ using SendGrid.Helpers.Mail;
 using System;
 using System.Net;
 using System.Text.Json;
+using GirlfriendPanel.api.Data;
+
 
 namespace GirlfriendPanel.api.Functions;
 
@@ -73,10 +75,42 @@ public sealed class SendStatus
         }
 
         // Env
+        // Env
         var apiKey = Environment.GetEnvironmentVariable("SENDGRID_API_KEY");
         var fromEmail = Environment.GetEnvironmentVariable("MAIL_FROM");
         var fromName = Environment.GetEnvironmentVariable("MAIL_FROM_NAME") ?? "GF Status Panel";
-        var toEmail = Environment.GetEnvironmentVariable("MAIL_TO");
+        var connStr = Environment.GetEnvironmentVariable("SqlConnectionString");
+
+        if (string.IsNullOrWhiteSpace(apiKey) ||
+            string.IsNullOrWhiteSpace(fromEmail) ||
+            string.IsNullOrWhiteSpace(connStr))
+        {
+            var err = req.CreateResponse(HttpStatusCode.InternalServerError);
+            await err.WriteStringAsync("Server-Konfiguration fehlt (SENDGRID_API_KEY / MAIL_FROM / SqlConnectionString).");
+            return err;
+        }
+
+        // Resolve bf email from DB using session.pairId
+        string toEmail;
+        try
+        {
+            using var conn = PairRepo.Open(connStr);
+            await conn.OpenAsync();
+
+            var pair = await PairRepo.GetById(conn, session.pairId);
+            if (pair is null)
+                return req.CreateResponse(HttpStatusCode.Unauthorized);
+
+            toEmail = pair.BfEmail;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "DB error");
+            var err = req.CreateResponse(HttpStatusCode.BadGateway);
+            await err.WriteStringAsync("DB Fehler.");
+            return err;
+        }
+
 
         if (string.IsNullOrWhiteSpace(apiKey) ||
             string.IsNullOrWhiteSpace(fromEmail) ||
@@ -201,7 +235,7 @@ public sealed class SendStatus
         return "Bereitschaft halten";
     }
     
-    private sealed record SessionPayload(long exp, string nonce);
+    private sealed record SessionPayload(Guid pairId, long exp, string nonce);
 
     private static bool TryGetBearer(HttpRequestData req, out string token)
     {

@@ -3,13 +3,8 @@ using GirlfriendPanel.api.Security;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace GirlfriendPanel.api.Functions;
 
@@ -22,7 +17,8 @@ public sealed class LoginFinish
         _logger = loggerFactory.CreateLogger<LoginFinish>();
     }
 
-    private sealed record ChallengePayload(long Exp, int[] CorrectIndices, string Nonce);
+    private sealed record ChallengePayload(Guid PairId, long Exp, int[] CorrectIndices, string Nonce);
+    private sealed record SessionPayload(Guid PairId, long Exp, string Nonce);
 
     [Function("LoginFinish")]
     public async Task<HttpResponseData> Run(
@@ -61,7 +57,7 @@ public sealed class LoginFinish
         if (DateTimeOffset.UtcNow.ToUnixTimeSeconds() > payload.Exp)
             return req.CreateResponse(HttpStatusCode.Unauthorized);
 
-        if (payload.CorrectIndices.Length != 4)
+        if (payload.CorrectIndices is null || payload.CorrectIndices.Length != 4)
             return req.CreateResponse(HttpStatusCode.Unauthorized);
 
         for (int i = 0; i < 4; i++)
@@ -72,12 +68,13 @@ public sealed class LoginFinish
                 return req.CreateResponse(HttpStatusCode.Unauthorized);
         }
 
-        // issue a simple session token (HMAC signed), expires in 12h
-        var sessionPayload = new
-        {
-            exp = DateTimeOffset.UtcNow.AddHours(12).ToUnixTimeSeconds(),
-            nonce = Guid.NewGuid().ToString("N")
-        };
+        // issue session token bound to PairId (expires in 12h)
+        var sessionPayload = new SessionPayload(
+            PairId: payload.PairId,
+            Exp: DateTimeOffset.UtcNow.AddHours(12).ToUnixTimeSeconds(),
+            Nonce: Guid.NewGuid().ToString("N")
+        );
+
         var sessionToken = TokenSigner.CreateToken(sessionPayload, sessionSecret);
 
         var res = req.CreateResponse(HttpStatusCode.OK);
