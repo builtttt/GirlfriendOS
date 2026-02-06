@@ -496,8 +496,9 @@
 
 		  const data = await res.json();
 		  // expected: { boards: int[][], token: string }
-		  boards = data.boards;
-		  challengeToken = data.token;
+            boards = data.boards ?? data.Boards;
+            challengeToken = data.token ?? data.Token;
+
 
 		  if(!boards || boards.length !== 4) throw new Error("Bad boards");
 		  if(!challengeToken) throw new Error("Missing token");
@@ -539,11 +540,10 @@
 		  }
 
 		  const data = await res.json();
-		  if(!data || !data.sessionToken){
-			throw new Error("Missing sessionToken");
-		  }
-
-		  localStorage.setItem("gf_session", data.sessionToken);
+			const sessionToken = data?.sessionToken ?? data?.SessionToken;
+            if (!sessionToken) throw new Error("Missing sessionToken");
+            localStorage.setItem("gf_session", sessionToken);
+			;
 		  toast("Login ✅");
 		  window.location.href = "index.html";
 		}catch(err){
