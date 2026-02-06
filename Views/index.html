@@ -422,7 +422,7 @@
 	  
 		<div class="morph-pill" id="pill" role="group" aria-label="Quick actions">
 		  <div class="morph-row" id="row">
-			<a href="login.html" class="mini-btn" aria-label="Logout" style="text-decoration:none;">🔒</a>
+			<button class="mini-btn" type="button" aria-label="Logout" id="logoutBtn">🔒</a>
 			<button class="mini-btn" type="button" aria-label="Theme" id="themeToggle">☀️</button>
 			<button class="mini-btn" type="button" aria-label="Settings">⚙️</button>
 		  </div>
@@ -534,6 +534,33 @@
   </div>
 
   <script>
+	function getSessionToken(){
+	  return localStorage.getItem("gf_session") || "";
+	}
+
+	function logout(){
+	  localStorage.removeItem("gf_session");
+	  window.location.href = "login.html";
+	}
+
+	function requireAuth(){
+	  const token = getSessionToken();
+	  if(!token){
+		window.location.href = "login.html";
+		return false;
+	  }
+	  return true;
+	}
+
+	// guard page access immediately
+	if(!requireAuth()){
+	  // stop running the rest if you want
+	  // throw new Error("Not authenticated");
+	}
+
+	document.getElementById("logoutBtn").addEventListener("click", () => {
+	  logout();
+	});
 
 	const themeToggle = document.getElementById("themeToggle");
 
@@ -654,14 +681,21 @@
 		needs: [...needs].map(x => x), // array
 		note: null
 	  };
-
+		const token = getSessionToken();
 	  try{
 		  const res = await fetch("/api/status", {
 		  method: "POST",
-		  headers: { "Content-Type": "application/json" },
+		  headers: { 
+			"Content-Type": "application/json",
+			"Authorization": "Bearer " + token
+		  },
 		  body: JSON.stringify(payload)
 		});
-
+		
+		if(res.status === 401){
+			logout();
+			return;
+		}
 		if(!res.ok){
 		  const t = await res.text().catch(() => "");
 		  throw new Error(`HTTP ${res.status} ${t}`.trim());

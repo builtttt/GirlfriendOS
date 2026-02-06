@@ -330,199 +330,319 @@
 
   <div class="toast" id="toast">Kopiert ✅</div>
 
+
   <script>
-    // ---- Emoji pool (curated "cute" set) ----
-    <!-- const EMOJIS = [ -->
-      <!-- "🐻","🐼","🐰","🐶","🐱","🐹","🦊","🐸", -->
-      <!-- "🐥","🦄","🐙","🐳","🐝","🦋","🐞","🦕", -->
-      <!-- "🍓","🍒","🍑","🍉","🍇","🍪","🍰","🧁", -->
-      <!-- "🍩","🍦","🍫","🍿","🍜","🍔","🍟","🍕", -->
-      <!-- "🌸","🌼","🌷","🌻","🍀","🌈","⭐","✨", -->
-      <!-- "🌙","☁️","🔥","💫","🎀","🧸","🫶","💖", -->
-      <!-- "💗","💞","💘","💕","💋","😈","😇","🥹", -->
-      <!-- "🪄","🎧","📸","🎮","🧋","🫧","🕯️","🪻" -->
-    <!-- ]; -->
-	const EMOJIS = [
-	  "🐻", // bear
-	  "🐰", // bunny
-	  "🐱", // cat
-	  "🐶", // dog
-	  "🦄", // unicorn
-	  "🌸", // flower
-	  "🌙", // moon
-	  "⭐", // star
-	  "🍓"  // strawberry
-	];
+	  // ---- Emoji pool (must match backend IDs 0..N-1) ----
+	  // IMPORTANT: order matters. Backend uses emoji IDs. Same order here.
+	    const EMOJIS = [
+			"🐻","🐼","🐰","🐶","🐱","🐹","🦊","🐸",
+			"🐥","🦄","🐙","🐳","🐝","🦋","🐞","🦕",
+			"🍓","🍒","🍑","🍉","🍇","🍪","🍰","🧁",
+			"🍩","🍦","🍫","🍿","🍜","🍔","🍟","🍕",
+			"🌸","🌼","🌷","🌻","🍀","🌈","⭐","✨",
+			"🌙","☁️","🔥","💫","🎀","🧸","🫶","💖",
+			"💗","💞","💘","💕","💋","😈","😇","🥹",
+			"🪄","🎧","📸","🎮","🧋","🫧","🕯️","🪻" 
+		];
 
-    // ---- UI helpers ----
-    const el = (id) => document.getElementById(id);
-    const show = (id) => {
-      document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-      el(id).classList.add("active");
-    };
-    const toast = (msg) => {
-      const t = el("toast");
-      t.textContent = msg;
-      t.classList.add("show");
-      setTimeout(() => t.classList.remove("show"), 1200);
-    };
+	  // ---- UI helpers ----
+	  const el = (id) => document.getElementById(id);
+	  const show = (id) => {
+		document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+		el(id).classList.add("active");
+	  };
+	  const toast = (msg) => {
+		const t = el("toast");
+		t.textContent = msg;
+		t.classList.add("show");
+		setTimeout(() => t.classList.remove("show"), 1200);
+	  };
 
-    // ---- Login code input (4 slots) ----
-    let code = ["", "", "", ""];
-    let activeIndex = 0;
+	  // ---- Option B login state ----
+	  let boards = null;        // 4 x 9 (emojiIds)
+	  let challengeToken = "";  // signed token from /api/login/start
+	  let step = 0;             // 0..3
+	  let answers = [];         // chosen indices 0..8 per step
 
-    function renderSlots(){
-      for(let i=0;i<4;i++){
-        const slot = el("slot"+i);
-        slot.textContent = code[i] ? code[i] : "⬜";
-        slot.classList.toggle("filled", !!code[i]);
-        slot.classList.toggle("active", i === activeIndex);
-      }
-      el("loginBtn").disabled = code.some(x => !x);
-    }
+	  // Slots show chosen emojis
+	  let code = ["", "", "", ""];
+	  let activeIndex = 0;
 
-    function pushEmoji(e){
-      if(activeIndex > 3) return;
-      code[activeIndex] = e;
-      activeIndex = Math.min(activeIndex + 1, 3);
-      // move to next empty slot if any
-      for(let i=0;i<4;i++){
-        if(!code[i]){ activeIndex = i; break; }
-      }
-      renderSlots();
-    }
+	  function renderSlots(){
+		for(let i=0;i<4;i++){
+		  const slot = el("slot"+i);
+		  slot.textContent = code[i] ? code[i] : "⬜";
+		  slot.classList.toggle("filled", !!code[i]);
+		  slot.classList.toggle("active", i === activeIndex);
+		}
+		// loginBtn is now "Start / Continue" only; we enable when we have a board.
+		el("loginBtn").disabled = !boards;
+	  }
 
-    function backspace(){
-      // if current slot filled, clear it. else go back to previous filled.
-      if(code[activeIndex]){
-        code[activeIndex] = "";
-      } else {
-        for(let i=activeIndex-1;i>=0;i--){
-          if(code[i]){
-            code[i] = "";
-            activeIndex = i;
-            break;
-          }
-        }
-      }
-      renderSlots();
-    }
+	  function clearAll(){
+		code = ["","","",""];
+		activeIndex = 0;
+		step = 0;
+		answers = [];
+		renderSlots();
+		renderKeypad();
+	  }
 
-    function clearAll(){
-      code = ["","","",""];
-      activeIndex = 0;
-      renderSlots();
-    }
+	  function backspace(){
+		// allow user to undo last choice
+		if(answers.length === 0) return;
 
-    // Click slot to set active index
-    document.querySelectorAll(".slot").forEach(s => {
-      s.addEventListener("click", () => {
-        activeIndex = Number(s.dataset.i);
-        renderSlots();
-      });
-    });
+		answers.pop();
+		step = answers.length;
 
-    el("backspaceBtn").addEventListener("click", backspace);
-    el("clearBtn").addEventListener("click", clearAll);
+		code[step] = "";
+		activeIndex = step;
 
-    // Build emoji picker
-	const keypad = el("emojiKeypad");
+		renderSlots();
+		renderKeypad();
+	  }
 
-	EMOJIS.forEach(e => {
-	  const b = document.createElement("button");
-	  b.type = "button";
-	  b.textContent = e;
-	  b.addEventListener("click", () => pushEmoji(e));
-	  keypad.appendChild(b);
-	});
+	  // Click slot to set active index (not super needed now, but keep it)
+	  document.querySelectorAll(".slot").forEach(s => {
+		s.addEventListener("click", () => {
+		  activeIndex = Number(s.dataset.i);
+		  renderSlots();
+		});
+	  });
 
+	  el("backspaceBtn").addEventListener("click", backspace);
+	  el("clearBtn").addEventListener("click", clearAll);
 
-    // Demo login: later replace with /api/pair/login
-    el("loginBtn").addEventListener("click", async () => {
-      const pairCode = code.join("");
-      // In demo: accept any full code and "store session"
-      localStorage.setItem("pairCode", pairCode);
-      toast("Login (Demo) ✅");
+	  // ---- Keypad now renders the current 3x3 board ----
+	  const keypad = el("emojiKeypad");
 
-      // next step would be: window.location = "panel.html" or show panel screen
-      // For now:
-    window.location.href = "index.html";
-    });
+	  function emojiFromId(id){
+		// fallback for mismatch
+		return EMOJIS[id] ?? "❓";
+	  }
 
-    // ---- Create pair (Demo) ----
-    function randomPairCode(){
-      const used = new Set();
-      const out = [];
-      while(out.length < 4){
-        const e = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
-        // allow duplicates? usually no, nicer without duplicates
-        if(used.has(e)) continue;
-        used.add(e);
-        out.push(e);
-      }
-      return out.join("");
-    }
+	  function renderKeypad(){
+		keypad.innerHTML = "";
 
-    function renderCreatedCode(codeStr){
-      el("createdCodeBig").innerHTML = "";
-      for(const ch of [...codeStr]){
-        const chip = document.createElement("div");
-        chip.className = "bigChip";
-        chip.textContent = ch;
-        el("createdCodeBig").appendChild(chip);
-      }
-      el("createdCodeText").textContent = "Dein Pair Code ist: " + codeStr;
-    }
+		if(!boards){
+		  // before start: show placeholders
+		  for(let i=0;i<9;i++){
+			const b = document.createElement("button");
+			b.type = "button";
+			b.textContent = "⬜";
+			b.disabled = true;
+			keypad.appendChild(b);
+		  }
+		  return;
+		}
 
-    el("createBtn").addEventListener("click", async () => {
-      const email = el("bfEmail").value.trim();
-      if(!email || !email.includes("@")){
-        toast("Bitte gültige E-Mail");
-        return;
-      }
+		const board = boards[step];
+		for(let i=0;i<9;i++){
+		  const emojiId = board[i];
+		  const b = document.createElement("button");
+		  b.type = "button";
+		  b.textContent = emojiFromId(emojiId);
+		  b.addEventListener("click", () => pickCell(i, emojiId));
+		  keypad.appendChild(b);
+		}
 
-      // DEMO: generate locally
-      const created = randomPairCode();
+		el("loginHint").textContent = `Step ${step+1}/4: Tippe ein Emoji`;
+	  }
 
-      // Later replace with:
-      // const res = await fetch("/api/pair/create", {method:"POST", headers:{...}, body: JSON.stringify({ bfEmail: email })});
-      // const data = await res.json(); created = data.pairCode;
+	  function pickCell(cellIndex, emojiId){
+		if(!boards) return;
+		if(step > 3) return;
 
-      localStorage.setItem("lastCreatedPairCode", created);
-      localStorage.setItem("bfEmail", email);
+		// store answer and show chosen emoji in slots
+		answers[step] = cellIndex;
+		code[step] = emojiFromId(emojiId);
+		activeIndex = Math.min(step + 1, 3);
 
-      renderCreatedCode(created);
-      el("resultCard").style.display = "block";
-      toast("Pair erstellt ✅");
-    });
+		step++;
 
-    el("copyCodeBtn").addEventListener("click", async () => {
-      const created = localStorage.getItem("lastCreatedPairCode") || "";
-      if(!created){ toast("Kein Code"); return; }
-      try{
-        await navigator.clipboard.writeText(created);
-        toast("Kopiert ✅");
-      }catch{
-        toast("Kopieren nicht möglich");
-      }
-    });
+		renderSlots();
 
-    el("useForLoginBtn").addEventListener("click", () => {
-      const created = localStorage.getItem("lastCreatedPairCode") || "";
-      if(!created){ toast("Kein Code"); return; }
-      code = [...created].slice(0,4);
-      activeIndex = 0;
-      renderSlots();
-      show("screenLogin");
-      toast("Übernommen ✅");
-    });
+		if(step >= 4){
+		  finishLogin().catch(err => {
+			console.error(err);
+		  });
+		  return;
+		}
 
-    // Navigation
-    el("goCreateBtn").addEventListener("click", () => show("screenCreate"));
-    el("backToLoginBtn").addEventListener("click", () => show("screenLogin"));
+		renderKeypad();
+	  }
 
-    // Init
-    renderSlots();
-  </script>
+	  // ---- API calls ----
+	  async function startLogin(){
+		el("loginBtn").disabled = true;
+		el("loginHint").textContent = "Starte Login…";
+
+		// reset state
+		boards = null;
+		challengeToken = "";
+		clearAll();
+
+		try{
+		  const res = await fetch("/api/login/start", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({}) // empty
+		  });
+
+		  if(!res.ok){
+			const t = await res.text().catch(() => "");
+			throw new Error(`HTTP ${res.status} ${t}`.trim());
+		  }
+
+		  const data = await res.json();
+		  // expected: { boards: int[][], token: string }
+		  boards = data.boards;
+		  challengeToken = data.token;
+
+		  if(!boards || boards.length !== 4) throw new Error("Bad boards");
+		  if(!challengeToken) throw new Error("Missing token");
+
+		  toast("Bereit ✅");
+		  el("loginBtn").disabled = true; // now user taps keypad instead
+		  renderSlots();
+		  renderKeypad();
+		}catch(err){
+		  console.error(err);
+		  toast("Login Start Fehler");
+		  el("loginBtn").disabled = false;
+		  el("loginHint").textContent = "Fehler beim Start. /api/login/start erreichbar?";
+		}
+	  }
+
+	  async function finishLogin(){
+		el("loginHint").textContent = "Prüfe…";
+
+		try{
+		  const res = await fetch("/api/login/finish", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+			  token: challengeToken,
+			  answers: answers
+			})
+		  });
+
+		  if(!res.ok){
+			// wrong code or expired
+			if(res.status === 401){
+			  toast("Falsch ❌");
+			  await restartChallenge();
+			  return;
+			}
+			const t = await res.text().catch(() => "");
+			throw new Error(`HTTP ${res.status} ${t}`.trim());
+		  }
+
+		  const data = await res.json();
+		  if(!data || !data.sessionToken){
+			throw new Error("Missing sessionToken");
+		  }
+
+		  localStorage.setItem("gf_session", data.sessionToken);
+		  toast("Login ✅");
+		  window.location.href = "index.html";
+		}catch(err){
+		  console.error(err);
+		  toast("Login Fehler");
+		  el("loginHint").textContent = "Fehler beim Login.";
+		  // allow retry
+		  await restartChallenge();
+		}
+	  }
+
+	  async function restartChallenge(){
+		// start fresh challenge (new token + new boards)
+		boards = null;
+		challengeToken = "";
+		clearAll();
+		el("loginBtn").disabled = false;
+		el("loginHint").textContent = "Tippe auf Einloggen zum Neustart.";
+		renderKeypad();
+	  }
+
+	  // Login button now starts the challenge (not submit a typed code)
+	  el("loginBtn").addEventListener("click", async () => {
+		await startLogin();
+	  });
+
+	  // ---- Create pair (Demo) ----
+	  function randomPairCode(){
+		const used = new Set();
+		const out = [];
+		while(out.length < 4){
+		  const e = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+		  if(used.has(e)) continue;
+		  used.add(e);
+		  out.push(e);
+		}
+		return out.join("");
+	  }
+
+	  function renderCreatedCode(codeStr){
+		el("createdCodeBig").innerHTML = "";
+		for(const ch of [...codeStr]){
+		  const chip = document.createElement("div");
+		  chip.className = "bigChip";
+		  chip.textContent = ch;
+		  el("createdCodeBig").appendChild(chip);
+		}
+		el("createdCodeText").textContent = "Dein Pair Code ist: " + codeStr;
+	  }
+
+	  el("createBtn").addEventListener("click", async () => {
+		const email = el("bfEmail").value.trim();
+		if(!email || !email.includes("@")){
+		  toast("Bitte gültige E-Mail");
+		  return;
+		}
+
+		const created = randomPairCode();
+		localStorage.setItem("lastCreatedPairCode", created);
+		localStorage.setItem("bfEmail", email);
+
+		renderCreatedCode(created);
+		el("resultCard").style.display = "block";
+		toast("Pair erstellt ✅");
+	  });
+
+	  el("copyCodeBtn").addEventListener("click", async () => {
+		const created = localStorage.getItem("lastCreatedPairCode") || "";
+		if(!created){ toast("Kein Code"); return; }
+		try{
+		  await navigator.clipboard.writeText(created);
+		  toast("Kopiert ✅");
+		}catch{
+		  toast("Kopieren nicht möglich");
+		}
+	  });
+
+	  // Keep this button, but now it just shows the old code visually (demo)
+	  el("useForLoginBtn").addEventListener("click", () => {
+		const created = localStorage.getItem("lastCreatedPairCode") || "";
+		if(!created){ toast("Kein Code"); return; }
+		// just show it in the slots (not used for auth anymore)
+		code = [...created].slice(0,4);
+		activeIndex = 0;
+		renderSlots();
+		show("screenLogin");
+		toast("Code angezeigt ✅");
+	  });
+
+	  // Navigation
+	  el("goCreateBtn").addEventListener("click", () => show("screenCreate"));
+	  el("backToLoginBtn").addEventListener("click", () => show("screenLogin"));
+
+	  // Init
+	  // Disable keypad until startLogin()
+	  renderSlots();
+	  renderKeypad();
+	  el("loginHint").textContent = "Tippe auf Einloggen. Dann wähle 4 Emojis (4 Steps).";
+</script>
+
 </body>
 </html>

@@ -1,4 +1,5 @@
 ﻿using GirlfriendPanel.api.Models;
+using GirlfriendPanel.api.Security;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
@@ -23,6 +24,21 @@ public sealed class SendStatus
     public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "status")] HttpRequestData req)
     {
+        var sessionSecret = Environment.GetEnvironmentVariable("SESSION_HMAC_SECRET");
+        if (string.IsNullOrWhiteSpace(sessionSecret))
+        {
+            var err = req.CreateResponse(HttpStatusCode.InternalServerError);
+            await err.WriteStringAsync("Server-Konfiguration fehlt (SESSION_HMAC_SECRET).");
+            return err;
+        }
+
+        if (!TryGetBearer(req, out var bearer))
+            return req.CreateResponse(HttpStatusCode.Unauthorized);
+
+        var session = TokenSigner.VerifyToken<SessionPayload>(bearer, sessionSecret);
+        if (session is null || DateTimeOffset.UtcNow.ToUnixTimeSeconds() > session.exp)
+            return req.CreateResponse(HttpStatusCode.Unauthorized);
+
         // Read JSON
         GfStatusRequest? payload;
         try
@@ -80,16 +96,16 @@ public sealed class SendStatus
 
         var subject = $"GF Status: {boyfriendAction}";
         var textBody =
-$@"Neuer Status 💌
+            $@"Neuer Status 💌
 
-Stimmung: {payload.Mood}/100
-Hunger:   {payload.Hunger}/100
-Energie:  {payload.Energy}/100
-Stress:   {payload.Stress}/100
-Needs:    {needsText}
+            Stimmung: {payload.Mood}/100
+            Hunger:   {payload.Hunger}/100
+            Energie:  {payload.Energy}/100
+            Stress:   {payload.Stress}/100
+            Needs:    {needsText}
 
-Aktion: {boyfriendAction}
-";
+            Aktion: {boyfriendAction}
+            ";
         var htmlBody = $@"
             <!DOCTYPE html>
             <html>
@@ -184,4 +200,17 @@ Aktion: {boyfriendAction}
         if (p.Mood <= 20) return "Sehr lieb sein";
         return "Bereitschaft halten";
     }
+    
+    private sealed record SessionPayload(long exp, string nonce);
+
+    private static bool TryGetBearer(HttpRequestData req, out string token)
+    {
+        token = "";
+        if (!req.Headers.TryGetValues("Authorization", out var values)) return false;
+        var h = values.FirstOrDefault() ?? "";
+        if (!h.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) return false;
+        token = h["Bearer ".Length..].Trim();
+        return token.Length > 20;
+    }
 }
+
