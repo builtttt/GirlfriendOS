@@ -17,6 +17,11 @@
       --shadow: 0 10px 30px rgba(0,0,0,.08);
       --radius:18px;
       --soft:#fce7f3;
+	  --pill-size: 38px;     /* was 48px */
+	  --mini-size: 28px;     /* was 36px */
+	  --emoji-size: 14px;   /* was 18px */
+	  --pill-padding: 4px;  /* was 6px */
+	  --gap: 8px;           /* was 10px */
     }
     *{box-sizing:border-box}
     body{
@@ -27,6 +32,52 @@
       padding:16px;
       min-height:100vh;
     }
+	
+	body.theme-switching{
+	  opacity:.985;
+	}
+	
+	/* BF Theme (dark-ish, clean) */
+	body.theme-bf{
+	  background: linear-gradient(135deg,#0b1220,#111827);
+	  color:#e5e7eb;
+	  --bg1:#0b1220;
+	  --bg2:#111827;
+	  --text:#e5e7eb;
+	}
+	
+	body.theme-bf .chip{ background:#0f172a; color:#cbd5e1; }
+	body.theme-bf .card{ background: rgba(15,23,42,.72); }
+	body.theme-bf .val{ background:#0b1220; color:#e5e7eb; }
+	body.theme-bf .slider{ background:#1f2937; }
+	body.theme-bf .pill{ background:#0f172a; }
+	body.theme-bf .bf{ background: rgba(249,168,212,.12); color:#e5e7eb; }
+
+	body.theme-bf .aff-square{ background:#0f172a; }
+	body.theme-bf .aff-square .txt{ color:#cbd5e1; }
+	body.theme-bf .slot { background:#0f172a; }
+	body.theme-bf .slot .txt{ color:#cbd5e1; }
+	body.theme-bf .keypad button { background:#0f172a; }
+	body.theme-bf .keypad button .txt{ color:#cbd5e1; }
+	body.theme-bf .btn-ghost { background:rgba(249,168,212,.12);color:#e5e7eb; }
+
+	body.theme-bf .sendbar{
+	  background: linear-gradient(to top,#0b1220,transparent);
+	}
+	body,
+	.card,
+	.chip,
+	.pill,
+	.val,
+	.bf,
+	.aff-square,
+	.sendbar {
+	  transition:
+		background-color 260ms ease,
+		color 260ms ease,
+		box-shadow 260ms ease,
+		border-color 260ms ease;
+	}
     .wrap{max-width:560px;margin:0 auto;padding-bottom:28px;}
     header{display:flex;justify-content:space-between;align-items:flex-start;margin:6px 0 14px;}
     h1{margin:0;font-size:22px}
@@ -189,7 +240,7 @@
       border-radius:999px;
       opacity:0;
       pointer-events:none;
-      transition: opacity .25s ease;
+      transition: opacity 0.25s ease;
     }
     .toast.show{opacity:1}
 
@@ -222,6 +273,100 @@
 	  transform: scale(.92);
 	}
 
+    /* the morphing pill */
+    .morph-pill {
+      height: var(--pill-size);
+      width:  var(--pill-size);                 /* collapsed circle */
+      border-radius: 999px;
+      background: #fff;
+	  
+
+      display: inline-flex;
+      align-items: center;
+
+      /* IMPORTANT: anchor on the right so it expands left */
+      justify-content: flex-end;
+
+      overflow: hidden;
+      white-space: nowrap;
+
+      padding: 0;                   /* becomes padding when open */
+      cursor: pointer;
+      user-select: none;
+
+      transition:
+        width 420ms cubic-bezier(.2,.9,.2,1),
+        padding 420ms cubic-bezier(.2,.9,.2,1),
+        box-shadow 220ms ease,
+        transform 120ms ease;
+    }
+
+    .morph-pill:active { transform: scale(0.98); }
+
+    /* inner row that measures content */
+    .morph-row {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--gap);
+      padding-right: 4px;           /* keeps the right edge comfy */
+    }
+
+    /* the 3 circle buttons */
+    .mini-btn {
+      width: var(--mini-size);
+      height: var(--mini-size);
+      border-radius: 999px;
+      background: #fff;
+	  padding: 0px;
+
+      display: inline-grid;
+      place-items: center;
+
+      font-size: var(--emoji-size);
+      cursor: pointer;
+
+      transition: transform 120ms ease, box-shadow 180ms ease;
+      flex:1;
+      border:0;
+      font-weight:700;
+      color:white;
+      box-shadow:0 8px 20px rgba(0,0,0,.12);
+    }
+
+    .mini-btn:hover { box-shadow: 0 6px 16px rgba(0,0,0,.12); transform: translateY(-1px); }
+    .mini-btn:active { transform: translateY(0) scale(0.98); }
+
+    /* collapsed state: only show the right-most button */
+    .morph-pill:not(.open) .mini-btn:not(:last-child) {
+      opacity: 0;
+      transform: translateX(10px);
+      pointer-events: none;
+    }
+
+    .morph-pill .mini-btn {
+      transition: opacity 220ms ease, transform 420ms cubic-bezier(.2,.9,.2,1), box-shadow 180ms ease;
+    }
+
+    /* open visuals */
+    .morph-pill.open {
+      box-shadow: 0 8px 22px rgba(0,0,0,.12);
+      padding: var(--pill-padding);                 /* creates pill breathing room */
+    }
+
+    .pill{
+      background:#f9fafb;
+      padding:10px;
+      border-radius:14px;
+    }
+    .pill .k{font-size:12px;color:var(--muted)}
+    .pill .v{font-weight:700}
+    .bf{
+      margin-top:10px;
+      padding:10px;
+      background:#fff0f6;
+      border-radius:14px;
+      font-size:13px;
+    }
 
   </style>
 </head>
@@ -230,8 +375,16 @@
     <header>
       <div>
         <h1>Status Panel</h1>
-        <div class="subhead">Login mit 4 Emojis. Danach Status senden 💌</div>
+        <div class="subhead">Code eingeben und Status senden 💌</div>
       </div>
+	  
+		<div class="morph-pill" id="pill" role="group" aria-label="Quick actions">
+		  <div class="morph-row" id="row">
+			<button class="mini-btn" type="button" aria-label="Forgot" id="btnForgot">❓</a>
+			<button class="mini-btn" type="button" aria-label="Theme" id="themeToggle">☀️</button>
+			<button class="mini-btn" type="button" aria-label="Settings">⚙️</button>
+		  </div>
+		</div>
     </header>
 
     <!-- SCREEN: LOGIN -->
@@ -239,7 +392,7 @@
       <div class="card">
         <div class="row">
           <div>
-            <div class="label">Login</div>
+            <div class="label">Anmelden</div>
             <div class="sub">Gib deinen Pair Code ein (4 Emojis)</div>
           </div>
         </div>
@@ -257,10 +410,6 @@
         </div>
 
         <div class="pickerWrap">
-          <div class="pickerHead">
-            <div class="label" style="font-size:13px;">Emoji Auswahl</div>
-            <div class="tiny">Tippe 4 Emojis</div>
-          </div>
           <div class="keypad" id="emojiKeypad"></div>
         </div>
 
@@ -306,7 +455,7 @@
         <div style="margin-top:12px;">
 			<button class="btn" type="button" id="createBtn">Pair erstellen</button>
           <div class="tiny" style="margin-top:8px;">
-            Später ersetzt du "Demo" durch Azure API Call.
+            Du erhältst danach deinen persönlichen Emoji Pair Code.
           </div>
         </div>
       </div>
@@ -360,7 +509,7 @@
 		const t = el("toast");
 		t.textContent = msg;
 		t.classList.add("show");
-		setTimeout(() => t.classList.remove("show"), 1200);
+		setTimeout(() => t.classList.remove("show"), 5000);
 	  };
 
 	  // ---- Option B login state ----
@@ -694,8 +843,72 @@
 	  // Disable keypad until startLogin()
 	  renderSlots();
 	  renderKeypad();
-	  el("loginHint").textContent = "Tippe auf Einloggen. Dann wähle 4 Emojis (4 Steps).";
+	  el("loginHint").textContent = "Tippe auf Einloggen. Dann wähle 4 Emojis.";
 	  el("loginBtn").disabled = false;
+
+		const pill = document.getElementById("pill");
+		const row = document.getElementById("row");
+
+		function setCollapsed() {
+		  pill.classList.remove("open");
+		  pill.style.width = "38px";
+		  pill.style.padding = "0px";
+		}
+
+		function setOpen() {
+		  pill.classList.add("open");
+		  // Measure content width and set pill width so it expands LEFT and fits contents.
+		  // The right edge stays fixed because the container is fixed to top-right.
+			const targetWidth = 110;
+		  pill.style.width = targetWidth + "px";
+		}
+
+		// Start collapsed
+		setCollapsed();
+
+		// Toggle on click (clicking anywhere on the pill)
+		pill.addEventListener("click", (e) => {
+		  // If you only want the right-most button to toggle, remove this and attach to that button.
+		  const isOpen = pill.classList.contains("open");
+		  if (isOpen) setCollapsed();
+		  else setOpen();
+		});
+
+		// Close when clicking outside
+		document.addEventListener("click", (e) => {
+		  if (!pill.contains(e.target)) setCollapsed();
+		});
+
+		// Recalculate when window resizes (fonts, zoom, etc.)
+		window.addEventListener("resize", () => {
+		  if (pill.classList.contains("open")) setOpen();
+		});
+		
+	const themeToggle = document.getElementById("themeToggle");
+
+	function applyTheme(theme){
+	  document.body.classList.add("theme-switching");
+	  document.body.classList.toggle("theme-bf", theme === "bf");
+	  themeToggle.textContent = theme === "bf" ? "☀️" : "🌙";
+	  localStorage.setItem("girlfriendos_theme", theme);
+	  setTimeout(() => {
+      document.body.classList.remove("theme-switching");
+	  }, 300);
+	}
+
+	themeToggle.addEventListener("click", () => {
+	  const current = localStorage.getItem("girlfriendos_theme") || "gf";
+	  applyTheme(current === "gf" ? "bf" : "gf");
+	});
+	const btnForgot = document.getElementById('btnForgot');
+
+	btnForgot.addEventListener('click', () => {
+	  toast('Pair-Code vergessen? Einfach ein neues Pair erstellen 😄');
+	});
+
+
+	// init theme
+	applyTheme(localStorage.getItem("girlfriendos_theme") || "gf");
 
 </script>
 
